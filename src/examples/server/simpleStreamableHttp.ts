@@ -27,6 +27,11 @@ server.tool(
         },
       ],
     };
+  },
+  {
+    title: 'Greeting Tool',
+    readOnlyHint: true,
+    openWorldHint: false
   }
 );
 
@@ -67,6 +72,11 @@ server.tool(
         }
       ],
     };
+  },
+  {
+    title: 'Multiple Greeting Tool', 
+    readOnlyHint: true,
+    openWorldHint: false
   }
 );
 
