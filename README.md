@@ -548,7 +548,48 @@ const result = await client.callTool({
     arg1: "value"
   }
 });
+
+// Disconnect
+await client.close();
 ```
+
+If you are using TypeScript >= 5.2, you can use `using` keyword to automatically close the connection when the block ends:
+```typescript
+import { Client } from "@modelcontextprotocol/sdk/client/index.js";
+import { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js";
+
+{
+  // initialize the client within a block
+  using const transport = new StdioClientTransport({
+    command: "node",
+    args: ["server.js"]
+  });
+
+  using const client = new Client(
+    {
+      name: "example-client",
+      version: "1.0.0"
+    }
+  );
+
+  await client.connect(transport);
+
+  // List prompts
+  const prompts = await client.listPrompts();
+
+  // Get a prompt
+  const prompt = await client.getPrompt({
+    name: "example-prompt",
+    arguments: {
+      arg1: "value"
+    }
+  });
+}
+
+// when the block ends, the client and transport are automatically closed
+```
+
+```typescript
 
 ### Proxy Authorization Requests Upstream
 
