@@ -99,6 +99,22 @@ export class Client<
   }
 
   /**
+   * Closes this client and the underlying transport with `using` syntax.
+   * This will automatically call `close()` on the transport.
+   * @example
+   * ```typescript
+   * // create a transport
+   * {
+   *   using transport = new MyTransport();
+   * }
+   * // when you exit the block, the transport will be closed
+   * ```
+   */
+  [Symbol.dispose]() {
+    this.close();
+  }
+
+  /**
    * Registers new capabilities. This can only be called before connecting to a transport.
    *
    * The new capabilities will be merged with any existing capabilities previously given (e.g., at initialization).
