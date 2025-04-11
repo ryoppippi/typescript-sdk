@@ -27,20 +27,20 @@ server.tool(
         },
       ],
     };
-  },
-  {
-    title: 'Greeting Tool',
-    readOnlyHint: true,
-    openWorldHint: false
   }
 );
 
-// Register a tool that sends multiple greetings with notifications
+// Register a tool that sends multiple greetings with notifications (with annotations)
 server.tool(
   'multi-greet',
   'A tool that sends different greetings with delays between them',
   {
     name: z.string().describe('Name to greet'),
+  },
+  {
+    title: 'Multiple Greeting Tool', 
+    readOnlyHint: true,
+    openWorldHint: false
   },
   async ({ name }, { sendNotification }): Promise<CallToolResult> => {
     const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
@@ -72,11 +72,6 @@ server.tool(
         }
       ],
     };
-  },
-  {
-    title: 'Multiple Greeting Tool', 
-    readOnlyHint: true,
-    openWorldHint: false
   }
 );
 
