@@ -51,7 +51,7 @@ import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js'
 
 ```typescript
 import { Client, StreamableHTTPClientTransport, StdioClientTransport } from '@modelcontextprotocol/client';
-import { McpServer, StdioServerTransport } from '@modelcontextprotocol/server';
+import { McpServer, StdioServerTransport, WebStandardStreamableHTTPServerTransport } from '@modelcontextprotocol/server';
 import { CallToolResultSchema } from '@modelcontextprotocol/core';
 
 // Node.js HTTP server transport is in the @modelcontextprotocol/node package
@@ -465,8 +465,7 @@ try {
 
 #### Why this change?
 
-Previously, `ErrorCode.RequestTimeout` (-32001) and `ErrorCode.ConnectionClosed` (-32000) were used for local timeout/connection errors. However, these errors never cross the wire as JSON-RPC responses - they are rejected locally. Using protocol error codes for local errors was
-semantically inconsistent.
+Previously, `ErrorCode.RequestTimeout` (-32001) and `ErrorCode.ConnectionClosed` (-32000) were used for local timeout/connection errors. However, these errors never cross the wire as JSON-RPC responses - they are rejected locally. Using protocol error codes for local errors was semantically inconsistent.
 
 The new design:
 
@@ -544,6 +543,51 @@ try {
         }
     }
 }
+```
+
+## Enhancements
+
+### Automatic JSON Schema validator selection by runtime
+
+The SDK now automatically selects the appropriate JSON Schema validator based on your runtime environment:
+
+- **Node.js**: Uses `AjvJsonSchemaValidator` (same as v1 default)
+- **Cloudflare Workers**: Uses `CfWorkerJsonSchemaValidator` (previously required manual configuration)
+
+This means Cloudflare Workers users no longer need to explicitly pass the validator:
+
+**Before (v1) - Cloudflare Workers required explicit configuration:**
+
+```typescript
+import { McpServer, CfWorkerJsonSchemaValidator } from '@modelcontextprotocol/server';
+
+const server = new McpServer(
+  { name: 'my-server', version: '1.0.0' },
+  {
+    capabilities: { tools: {} },
+    jsonSchemaValidator: new CfWorkerJsonSchemaValidator() // Required in v1
+  }
+);
+```
+
+**After (v2) - Works automatically:**
+
+```typescript
+import { McpServer } from '@modelcontextprotocol/server';
+
+const server = new McpServer(
+  { name: 'my-server', version: '1.0.0' },
+  { capabilities: { tools: {} } }
+  // Validator auto-selected based on runtime
+);
+```
+
+You can still explicitly override the validator if needed. The validators are available via the `_shims` export:
+
+```typescript
+import { DefaultJsonSchemaValidator } from '@modelcontextprotocol/server/_shims';
+// or
+import { AjvJsonSchemaValidator, CfWorkerJsonSchemaValidator } from '@modelcontextprotocol/server';
 ```
 
 ## Unchanged APIs
