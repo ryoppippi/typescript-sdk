@@ -18,19 +18,16 @@ import type {
     LoggingLevel,
     LoggingMessageNotification,
     MessageExtraInfo,
-    Notification,
+    NotificationMethod,
     NotificationOptions,
     ProtocolOptions,
-    Request,
     RequestMethod,
     RequestOptions,
     RequestTypeMap,
     ResourceUpdatedNotification,
-    Result,
+    ResultTypeMap,
     ServerCapabilities,
     ServerContext,
-    ServerNotification,
-    ServerRequest,
     ServerResult,
     ToolResultContent,
     ToolUseContent
@@ -87,43 +84,15 @@ export type ServerOptions = ProtocolOptions & {
  *
  * This server will automatically respond to the initialization flow as initiated from the client.
  *
- * To use with custom types, extend the base Request/Notification/Result types and pass them as type parameters:
- *
- * ```typescript
- * // Custom schemas
- * const CustomRequestSchema = RequestSchema.extend({...})
- * const CustomNotificationSchema = NotificationSchema.extend({...})
- * const CustomResultSchema = ResultSchema.extend({...})
- *
- * // Type aliases
- * type CustomRequest = z.infer<typeof CustomRequestSchema>
- * type CustomNotification = z.infer<typeof CustomNotificationSchema>
- * type CustomResult = z.infer<typeof CustomResultSchema>
- *
- * // Create typed server
- * const server = new Server<CustomRequest, CustomNotification, CustomResult>({
- *   name: "CustomServer",
- *   version: "1.0.0"
- * })
- * ```
  * @deprecated Use `McpServer` instead for the high-level API. Only use `Server` for advanced use cases.
  */
-export class Server<
-    RequestT extends Request = Request,
-    NotificationT extends Notification = Notification,
-    ResultT extends Result = Result
-> extends Protocol<
-    ServerRequest | RequestT,
-    ServerNotification | NotificationT,
-    ServerResult | ResultT,
-    ServerContext<ServerRequest | RequestT, ServerNotification | NotificationT>
-> {
+export class Server extends Protocol<ServerContext> {
     private _clientCapabilities?: ClientCapabilities;
     private _clientVersion?: Implementation;
     private _capabilities: ServerCapabilities;
     private _instructions?: string;
     private _jsonSchemaValidator: jsonSchemaValidator;
-    private _experimental?: { tasks: ExperimentalServerTasks<RequestT, NotificationT, ResultT> };
+    private _experimental?: { tasks: ExperimentalServerTasks };
 
     /**
      * Callback for when initialization has fully completed (i.e., the client has sent an `initialized` notification).
@@ -159,10 +128,7 @@ export class Server<
         }
     }
 
-    protected override buildContext(
-        ctx: BaseContext<ServerRequest | RequestT, ServerNotification | NotificationT>,
-        transportInfo?: MessageExtraInfo
-    ): ServerContext<ServerRequest | RequestT, ServerNotification | NotificationT> {
+    protected override buildContext(ctx: BaseContext, transportInfo?: MessageExtraInfo): ServerContext {
         // Only create http when there's actual HTTP transport info or auth info
         const hasHttpInfo =
             ctx.http || transportInfo?.requestInfo || transportInfo?.closeSSEStream || transportInfo?.closeStandaloneSSEStream;
@@ -192,7 +158,7 @@ export class Server<
      *
      * @experimental
      */
-    get experimental(): { tasks: ExperimentalServerTasks<RequestT, NotificationT, ResultT> } {
+    get experimental(): { tasks: ExperimentalServerTasks } {
         if (!this._experimental) {
             this._experimental = {
                 tasks: new ExperimentalServerTasks(this)
@@ -230,16 +196,10 @@ export class Server<
      */
     public override setRequestHandler<M extends RequestMethod>(
         method: M,
-        handler: (
-            request: RequestTypeMap[M],
-            ctx: ServerContext<ServerRequest | RequestT, ServerNotification | NotificationT>
-        ) => ServerResult | ResultT | Promise<ServerResult | ResultT>
+        handler: (request: RequestTypeMap[M], ctx: ServerContext) => ResultTypeMap[M] | Promise<ResultTypeMap[M]>
     ): void {
         if (method === 'tools/call') {
-            const wrappedHandler = async (
-                request: RequestTypeMap[M],
-                ctx: ServerContext<ServerRequest | RequestT, ServerNotification | NotificationT>
-            ): Promise<ServerResult | ResultT> => {
+            const wrappedHandler = async (request: RequestTypeMap[M], ctx: ServerContext): Promise<ServerResult> => {
                 const validatedRequest = parseSchema(CallToolRequestSchema, request);
                 if (!validatedRequest.success) {
                     const errorMessage =
@@ -283,8 +243,8 @@ export class Server<
         return super.setRequestHandler(method, handler);
     }
 
-    protected assertCapabilityForMethod(method: RequestT['method']): void {
-        switch (method as ServerRequest['method']) {
+    protected assertCapabilityForMethod(method: RequestMethod): void {
+        switch (method) {
             case 'sampling/createMessage': {
                 if (!this._clientCapabilities?.sampling) {
                     throw new SdkError(SdkErrorCode.CapabilityNotSupported, `Client does not support sampling (required for ${method})`);
@@ -316,8 +276,8 @@ export class Server<
         }
     }
 
-    protected assertNotificationCapability(method: (ServerNotification | NotificationT)['method']): void {
-        switch (method as ServerNotification['method']) {
+    protected assertNotificationCapability(method: NotificationMethod): void {
+        switch (method) {
             case 'notifications/message': {
                 if (!this._capabilities.logging) {
                     throw new SdkError(SdkErrorCode.CapabilityNotSupported, `Server does not support logging (required for ${method})`);

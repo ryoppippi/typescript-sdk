@@ -980,13 +980,9 @@ export class ResourceTemplate {
     }
 }
 
-export type BaseToolCallback<
-    SendResultT extends Result,
-    Ctx extends ServerContext,
-    Args extends AnySchema | undefined
-> = Args extends AnySchema
-    ? (args: SchemaOutput<Args>, ctx: Ctx) => SendResultT | Promise<SendResultT>
-    : (ctx: Ctx) => SendResultT | Promise<SendResultT>;
+export type BaseToolCallback<ResultT extends Result, Ctx extends ServerContext, Args extends AnySchema | undefined> = Args extends AnySchema
+    ? (args: SchemaOutput<Args>, ctx: Ctx) => ResultT | Promise<ResultT>
+    : (ctx: Ctx) => ResultT | Promise<ResultT>;
 
 /**
  * Callback for a tool handler registered with Server.tool().
