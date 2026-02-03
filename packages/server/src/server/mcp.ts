@@ -6,8 +6,8 @@ import type {
     CompleteRequestPrompt,
     CompleteRequestResourceTemplate,
     CompleteResult,
-    CreateTaskRequestHandlerExtra,
     CreateTaskResult,
+    CreateTaskServerContext,
     GetPromptResult,
     Implementation,
     ListPromptsResult,
@@ -18,13 +18,11 @@ import type {
     PromptArgument,
     PromptReference,
     ReadResourceResult,
-    RequestHandlerExtra,
     Resource,
     ResourceTemplateReference,
     Result,
     SchemaOutput,
-    ServerNotification,
-    ServerRequest,
+    ServerContext,
     Tool,
     ToolAnnotations,
     ToolExecution,
@@ -152,7 +150,7 @@ export class McpServer {
             })
         );
 
-        this.server.setRequestHandler('tools/call', async (request, extra): Promise<CallToolResult | CreateTaskResult> => {
+        this.server.setRequestHandler('tools/call', async (request, ctx): Promise<CallToolResult | CreateTaskResult> => {
             try {
                 const tool = this._registeredTools[request.params.name];
                 if (!tool) {
@@ -184,12 +182,12 @@ export class McpServer {
 
                 // Handle taskSupport 'optional' without task augmentation - automatic polling
                 if (taskSupport === 'optional' && !isTaskRequest && isTaskHandler) {
-                    return await this.handleAutomaticTaskPolling(tool, request, extra);
+                    return await this.handleAutomaticTaskPolling(tool, request, ctx);
                 }
 
                 // Normal execution path
                 const args = await this.validateToolInput(tool, request.params.arguments, request.params.name);
-                const result = await this.executeToolHandler(tool, args, extra);
+                const result = await this.executeToolHandler(tool, args, ctx);
 
                 // Return CreateTaskResult immediately for task requests
                 if (isTaskRequest) {
@@ -293,13 +291,9 @@ export class McpServer {
     /**
      * Executes a tool handler (either regular or task-based).
      */
-    private async executeToolHandler(
-        tool: RegisteredTool,
-        args: unknown,
-        extra: RequestHandlerExtra<ServerRequest, ServerNotification>
-    ): Promise<CallToolResult | CreateTaskResult> {
+    private async executeToolHandler(tool: RegisteredTool, args: unknown, ctx: ServerContext): Promise<CallToolResult | CreateTaskResult> {
         // Executor encapsulates handler invocation with proper types
-        return tool.executor(args, extra);
+        return tool.executor(args, ctx);
     }
 
     /**
@@ -308,15 +302,15 @@ export class McpServer {
     private async handleAutomaticTaskPolling<RequestT extends CallToolRequest>(
         tool: RegisteredTool,
         request: RequestT,
-        extra: RequestHandlerExtra<ServerRequest, ServerNotification>
+        ctx: ServerContext
     ): Promise<CallToolResult> {
-        if (!extra.taskStore) {
+        if (!ctx.task?.store) {
             throw new Error('No task store provided for task-capable tool.');
         }
 
         // Validate input and create task using the executor
         const args = await this.validateToolInput(tool, request.params.arguments, request.params.name);
-        const createTaskResult = (await tool.executor(args, extra)) as CreateTaskResult;
+        const createTaskResult = (await tool.executor(args, ctx)) as CreateTaskResult;
 
         // Poll until completion
         const taskId = createTaskResult.task.taskId;
@@ -325,7 +319,7 @@ export class McpServer {
 
         while (task.status !== 'completed' && task.status !== 'failed' && task.status !== 'cancelled') {
             await new Promise(resolve => setTimeout(resolve, pollInterval));
-            const updatedTask = await extra.taskStore.getTask(taskId);
+            const updatedTask = await ctx.task.store.getTask(taskId);
             if (!updatedTask) {
                 throw new ProtocolError(ProtocolErrorCode.InternalError, `Task ${taskId} not found during polling`);
             }
@@ -333,7 +327,7 @@ export class McpServer {
         }
 
         // Return the final result
-        return (await extra.taskStore.getTaskResult(taskId)) as CallToolResult;
+        return (await ctx.task.store.getTaskResult(taskId)) as CallToolResult;
     }
 
     private _completionHandlerInitialized = false;
@@ -439,7 +433,7 @@ export class McpServer {
             }
         });
 
-        this.server.setRequestHandler('resources/list', async (_request, extra) => {
+        this.server.setRequestHandler('resources/list', async (_request, ctx) => {
             const resources = Object.entries(this._registeredResources)
                 .filter(([_, resource]) => resource.enabled)
                 .map(([uri, resource]) => ({
@@ -454,7 +448,7 @@ export class McpServer {
                     continue;
                 }
 
-                const result = await template.resourceTemplate.listCallback(extra);
+                const result = await template.resourceTemplate.listCallback(ctx);
                 for (const resource of result.resources) {
                     templateResources.push({
                         ...template.metadata,
@@ -477,7 +471,7 @@ export class McpServer {
             return { resourceTemplates };
         });
 
-        this.server.setRequestHandler('resources/read', async (request, extra) => {
+        this.server.setRequestHandler('resources/read', async (request, ctx) => {
             const uri = new URL(request.params.uri);
 
             // First check for exact resource match
@@ -486,14 +480,14 @@ export class McpServer {
                 if (!resource.enabled) {
                     throw new ProtocolError(ProtocolErrorCode.InvalidParams, `Resource ${uri} disabled`);
                 }
-                return resource.readCallback(uri, extra);
+                return resource.readCallback(uri, ctx);
             }
 
             // Then check templates
             for (const template of Object.values(this._registeredResourceTemplates)) {
                 const variables = template.resourceTemplate.uriTemplate.match(uri.toString());
                 if (variables) {
-                    return template.readCallback(uri, variables, extra);
+                    return template.readCallback(uri, variables, ctx);
                 }
             }
 
@@ -535,7 +529,7 @@ export class McpServer {
             })
         );
 
-        this.server.setRequestHandler('prompts/get', async (request, extra): Promise<GetPromptResult> => {
+        this.server.setRequestHandler('prompts/get', async (request, ctx): Promise<GetPromptResult> => {
             const prompt = this._registeredPrompts[request.params.name];
             if (!prompt) {
                 throw new ProtocolError(ProtocolErrorCode.InvalidParams, `Prompt ${request.params.name} not found`);
@@ -546,7 +540,7 @@ export class McpServer {
             }
 
             // Handler encapsulates parsing and callback invocation with proper types
-            return prompt.handler(request.params.arguments, extra);
+            return prompt.handler(request.params.arguments, ctx);
         });
 
         this._promptHandlersInitialized = true;
@@ -988,20 +982,16 @@ export class ResourceTemplate {
 
 export type BaseToolCallback<
     SendResultT extends Result,
-    Extra extends RequestHandlerExtra<ServerRequest, ServerNotification>,
+    Ctx extends ServerContext,
     Args extends AnySchema | undefined
 > = Args extends AnySchema
-    ? (args: SchemaOutput<Args>, extra: Extra) => SendResultT | Promise<SendResultT>
-    : (extra: Extra) => SendResultT | Promise<SendResultT>;
+    ? (args: SchemaOutput<Args>, ctx: Ctx) => SendResultT | Promise<SendResultT>
+    : (ctx: Ctx) => SendResultT | Promise<SendResultT>;
 
 /**
  * Callback for a tool handler registered with Server.tool().
  */
-export type ToolCallback<Args extends AnySchema | undefined = undefined> = BaseToolCallback<
-    CallToolResult,
-    RequestHandlerExtra<ServerRequest, ServerNotification>,
-    Args
->;
+export type ToolCallback<Args extends AnySchema | undefined = undefined> = BaseToolCallback<CallToolResult, ServerContext, Args>;
 
 /**
  * Supertype that can handle both regular tools (simple callback) and task-based tools (task handler object).
@@ -1011,10 +1001,7 @@ export type AnyToolHandler<Args extends AnySchema | undefined = undefined> = Too
 /**
  * Internal executor type that encapsulates handler invocation with proper types.
  */
-type ToolExecutor = (
-    args: unknown,
-    extra: RequestHandlerExtra<ServerRequest, ServerNotification>
-) => Promise<CallToolResult | CreateTaskResult>;
+type ToolExecutor = (args: unknown, ctx: ServerContext) => Promise<CallToolResult | CreateTaskResult>;
 
 export type RegisteredTool = {
     title?: string;
@@ -1046,37 +1033,35 @@ export type RegisteredTool = {
 
 /**
  * Creates an executor that invokes the handler with the appropriate arguments.
- * When inputSchema is defined, the handler is called with (args, extra).
- * When inputSchema is undefined, the handler is called with just (extra).
+ * When inputSchema is defined, the handler is called with (args, ctx).
+ * When inputSchema is undefined, the handler is called with just (ctx).
  */
 function createToolExecutor(inputSchema: AnySchema | undefined, handler: AnyToolHandler<AnySchema | undefined>): ToolExecutor {
     const isTaskHandler = 'createTask' in handler;
 
     if (isTaskHandler) {
         const taskHandler = handler as TaskHandlerInternal;
-        return async (args, extra) => {
-            if (!extra.taskStore) {
+        return async (args, ctx) => {
+            if (!ctx.task?.store) {
                 throw new Error('No task store provided.');
             }
-            const taskExtra: CreateTaskRequestHandlerExtra = { ...extra, taskStore: extra.taskStore };
+            const taskCtx: CreateTaskServerContext = { ...ctx, task: { store: ctx.task.store, requestedTtl: ctx.task?.requestedTtl } };
             if (inputSchema) {
-                return taskHandler.createTask(args, taskExtra);
+                return taskHandler.createTask(args, taskCtx);
             }
-            // When no inputSchema, call with just extra (the handler expects (extra) signature)
-            return (taskHandler.createTask as (extra: CreateTaskRequestHandlerExtra) => CreateTaskResult | Promise<CreateTaskResult>)(
-                taskExtra
-            );
+            // When no inputSchema, call with just ctx (the handler expects (ctx) signature)
+            return (taskHandler.createTask as (ctx: CreateTaskServerContext) => CreateTaskResult | Promise<CreateTaskResult>)(taskCtx);
         };
     }
 
     if (inputSchema) {
         const callback = handler as ToolCallbackInternal;
-        return async (args, extra) => callback(args, extra);
+        return async (args, ctx) => callback(args, ctx);
     }
 
-    // When no inputSchema, call with just extra (the handler expects (extra) signature)
-    const callback = handler as (extra: RequestHandlerExtra<ServerRequest, ServerNotification>) => CallToolResult | Promise<CallToolResult>;
-    return async (_args, extra) => callback(extra);
+    // When no inputSchema, call with just ctx (the handler expects (ctx) signature)
+    const callback = handler as (ctx: ServerContext) => CallToolResult | Promise<CallToolResult>;
+    return async (_args, ctx) => callback(ctx);
 }
 
 const EMPTY_OBJECT_JSON_SCHEMA = {
@@ -1092,17 +1077,12 @@ export type ResourceMetadata = Omit<Resource, 'uri' | 'name'>;
 /**
  * Callback to list all resources matching a given template.
  */
-export type ListResourcesCallback = (
-    extra: RequestHandlerExtra<ServerRequest, ServerNotification>
-) => ListResourcesResult | Promise<ListResourcesResult>;
+export type ListResourcesCallback = (ctx: ServerContext) => ListResourcesResult | Promise<ListResourcesResult>;
 
 /**
  * Callback to read a resource at a given URI.
  */
-export type ReadResourceCallback = (
-    uri: URL,
-    extra: RequestHandlerExtra<ServerRequest, ServerNotification>
-) => ReadResourceResult | Promise<ReadResourceResult>;
+export type ReadResourceCallback = (uri: URL, ctx: ServerContext) => ReadResourceResult | Promise<ReadResourceResult>;
 
 export type RegisteredResource = {
     name: string;
@@ -1129,7 +1109,7 @@ export type RegisteredResource = {
 export type ReadResourceTemplateCallback = (
     uri: URL,
     variables: Variables,
-    extra: RequestHandlerExtra<ServerRequest, ServerNotification>
+    ctx: ServerContext
 ) => ReadResourceResult | Promise<ReadResourceResult>;
 
 export type RegisteredResourceTemplate = {
@@ -1152,28 +1132,19 @@ export type RegisteredResourceTemplate = {
 };
 
 export type PromptCallback<Args extends AnySchema | undefined = undefined> = Args extends AnySchema
-    ? (
-          args: SchemaOutput<Args>,
-          extra: RequestHandlerExtra<ServerRequest, ServerNotification>
-      ) => GetPromptResult | Promise<GetPromptResult>
-    : (extra: RequestHandlerExtra<ServerRequest, ServerNotification>) => GetPromptResult | Promise<GetPromptResult>;
+    ? (args: SchemaOutput<Args>, ctx: ServerContext) => GetPromptResult | Promise<GetPromptResult>
+    : (ctx: ServerContext) => GetPromptResult | Promise<GetPromptResult>;
 
 /**
  * Internal handler type that encapsulates parsing and callback invocation.
  * This allows type-safe handling without runtime type assertions.
  */
-type PromptHandler = (
-    args: Record<string, unknown> | undefined,
-    extra: RequestHandlerExtra<ServerRequest, ServerNotification>
-) => Promise<GetPromptResult>;
+type PromptHandler = (args: Record<string, unknown> | undefined, ctx: ServerContext) => Promise<GetPromptResult>;
 
-type ToolCallbackInternal = (
-    args: unknown,
-    extra: RequestHandlerExtra<ServerRequest, ServerNotification>
-) => CallToolResult | Promise<CallToolResult>;
+type ToolCallbackInternal = (args: unknown, ctx: ServerContext) => CallToolResult | Promise<CallToolResult>;
 
 type TaskHandlerInternal = {
-    createTask: (args: unknown, extra: CreateTaskRequestHandlerExtra) => CreateTaskResult | Promise<CreateTaskResult>;
+    createTask: (args: unknown, ctx: CreateTaskServerContext) => CreateTaskResult | Promise<CreateTaskResult>;
 };
 
 export type RegisteredPrompt = {
@@ -1206,26 +1177,21 @@ function createPromptHandler(
     callback: PromptCallback<AnySchema | undefined>
 ): PromptHandler {
     if (argsSchema) {
-        const typedCallback = callback as (
-            args: SchemaOutput<AnySchema>,
-            extra: RequestHandlerExtra<ServerRequest, ServerNotification>
-        ) => GetPromptResult | Promise<GetPromptResult>;
+        const typedCallback = callback as (args: SchemaOutput<AnySchema>, ctx: ServerContext) => GetPromptResult | Promise<GetPromptResult>;
 
-        return async (args, extra) => {
+        return async (args, ctx) => {
             const parseResult = await parseSchemaAsync(argsSchema, args);
             if (!parseResult.success) {
                 const errorMessage = parseResult.error.issues.map((i: { message: string }) => i.message).join(', ');
                 throw new ProtocolError(ProtocolErrorCode.InvalidParams, `Invalid arguments for prompt ${name}: ${errorMessage}`);
             }
-            return typedCallback(parseResult.data as SchemaOutput<AnySchema>, extra);
+            return typedCallback(parseResult.data as SchemaOutput<AnySchema>, ctx);
         };
     } else {
-        const typedCallback = callback as (
-            extra: RequestHandlerExtra<ServerRequest, ServerNotification>
-        ) => GetPromptResult | Promise<GetPromptResult>;
+        const typedCallback = callback as (ctx: ServerContext) => GetPromptResult | Promise<GetPromptResult>;
 
-        return async (_args, extra) => {
-            return typedCallback(extra);
+        return async (_args, ctx) => {
+            return typedCallback(ctx);
         };
     }
 }

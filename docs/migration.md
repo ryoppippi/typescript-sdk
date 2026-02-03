@@ -156,7 +156,7 @@ const transport = new StreamableHTTPClientTransport(url, {
 });
 
 // Reading headers in a request handler
-const sessionId = extra.requestInfo?.headers.get('mcp-session-id');
+const sessionId = ctx.http?.req?.headers.get('mcp-session-id');
 ```
 
 ### `McpServer.tool()`, `.prompt()`, `.resource()` removed
@@ -380,6 +380,83 @@ import { JSONRPCError, ResourceReference, isJSONRPCError } from '@modelcontextpr
 ```typescript
 import { JSONRPCErrorResponse, ResourceTemplateReference, isJSONRPCErrorResponse } from '@modelcontextprotocol/core';
 ```
+
+### Request handler context types
+
+The `RequestHandlerExtra` type has been replaced with a structured context type hierarchy using nested groups:
+
+| v1 | v2 |
+|----|-----|
+| `RequestHandlerExtra` (flat, all fields) | `ServerContext` (server handlers) or `ClientContext` (client handlers) |
+| `extra` parameter name | `ctx` parameter name |
+| `extra.signal` | `ctx.mcpReq.signal` |
+| `extra.requestId` | `ctx.mcpReq.id` |
+| `extra._meta` | `ctx.mcpReq._meta` |
+| `extra.sendRequest(...)` | `ctx.mcpReq.send(...)` |
+| `extra.sendNotification(...)` | `ctx.mcpReq.notify(...)` |
+| `extra.authInfo` | `ctx.http?.authInfo` |
+| `extra.requestInfo` | `ctx.http?.req` (only on `ServerContext`) |
+| `extra.closeSSEStream` | `ctx.http?.closeSSE` (only on `ServerContext`) |
+| `extra.closeStandaloneSSEStream` | `ctx.http?.closeStandaloneSSE` (only on `ServerContext`) |
+| `extra.sessionId` | `ctx.sessionId` |
+| `extra.taskStore` | `ctx.task?.store` |
+| `extra.taskId` | `ctx.task?.id` |
+| `extra.taskRequestedTtl` | `ctx.task?.requestedTtl` |
+
+**Before (v1):**
+
+```typescript
+server.setRequestHandler(CallToolRequestSchema, async (request, extra) => {
+  const headers = extra.requestInfo?.headers;
+  const taskStore = extra.taskStore;
+  await extra.sendNotification({ method: 'notifications/progress', params: { progressToken: 'abc', progress: 50, total: 100 } });
+  return { content: [{ type: 'text', text: 'result' }] };
+});
+```
+
+**After (v2):**
+
+```typescript
+server.setRequestHandler('tools/call', async (request, ctx) => {
+  const headers = ctx.http?.req?.headers;
+  const taskStore = ctx.task?.store;
+  await ctx.mcpReq.notify({ method: 'notifications/progress', params: { progressToken: 'abc', progress: 50, total: 100 } });
+  return { content: [{ type: 'text', text: 'result' }] };
+});
+```
+
+Context fields are organized into 4 groups:
+
+- **`mcpReq`** — request-level concerns: `id`, `method`, `_meta`, `signal`, `send()`, `notify()`, plus server-only `log()`, `elicitInput()`, and `requestSampling()`
+- **`http?`** — HTTP transport concerns (undefined for stdio): `authInfo`, plus server-only `req`, `closeSSE`, `closeStandaloneSSE`
+- **`task?`** — task lifecycle: `id`, `store`, `requestedTtl`
+
+`BaseContext` is the common base type shared by both `ServerContext` and `ClientContext`. `ServerContext` extends each group with server-specific additions via type intersection.
+
+`ServerContext` also provides convenience methods for common server→client operations:
+
+```typescript
+server.setRequestHandler('tools/call', async (request, ctx) => {
+  // Send a log message (respects client's log level filter)
+  await ctx.mcpReq.log('info', 'Processing tool call', 'my-logger');
+
+  // Request client to sample an LLM
+  const samplingResult = await ctx.mcpReq.requestSampling({
+    messages: [{ role: 'user', content: { type: 'text', text: 'Hello' } }],
+    maxTokens: 100,
+  });
+
+  // Elicit user input via a form
+  const elicitResult = await ctx.mcpReq.elicitInput({
+    message: 'Please provide details',
+    requestedSchema: { type: 'object', properties: { name: { type: 'string' } } },
+  });
+
+  return { content: [{ type: 'text', text: 'done' }] };
+});
+```
+
+These replace the pattern of calling `server.sendLoggingMessage()`, `server.createMessage()`, and `server.elicitInput()` from within handlers.
 
 ### Error hierarchy refactoring
 

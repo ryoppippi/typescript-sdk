@@ -297,7 +297,7 @@ extra.requestInfo?.headers['mcp-session-id']
 
 // v2: Headers object, .get() access
 headers: new Headers({ 'Authorization': 'Bearer token' })
-extra.requestInfo?.headers.get('mcp-session-id')
+ctx.http?.req?.headers.get('mcp-session-id')
 ```
 
 ## 8. Removed Server Features
@@ -366,11 +366,41 @@ Schema to method string mapping:
 
 Request/notification params remain fully typed. Remove unused schema imports after migration.
 
-## 10. Client Behavioral Changes
+## 10. Request Handler Context Types
+
+`RequestHandlerExtra` → structured context types with nested groups. Rename `extra` → `ctx` in all handler callbacks.
+
+| v1 | v2 |
+|----|-----|
+| `RequestHandlerExtra` | `ServerContext` (server) / `ClientContext` (client) / `BaseContext` (base) |
+| `extra` (param name) | `ctx` |
+| `extra.signal` | `ctx.mcpReq.signal` |
+| `extra.requestId` | `ctx.mcpReq.id` |
+| `extra._meta` | `ctx.mcpReq._meta` |
+| `extra.sendRequest(...)` | `ctx.mcpReq.send(...)` |
+| `extra.sendNotification(...)` | `ctx.mcpReq.notify(...)` |
+| `extra.authInfo` | `ctx.http?.authInfo` |
+| `extra.sessionId` | `ctx.sessionId` |
+| `extra.requestInfo` | `ctx.http?.req` (only `ServerContext`) |
+| `extra.closeSSEStream` | `ctx.http?.closeSSE` (only `ServerContext`) |
+| `extra.closeStandaloneSSEStream` | `ctx.http?.closeStandaloneSSE` (only `ServerContext`) |
+| `extra.taskStore` | `ctx.task?.store` |
+| `extra.taskId` | `ctx.task?.id` |
+| `extra.taskRequestedTtl` | `ctx.task?.requestedTtl` |
+
+`ServerContext` convenience methods (new in v2, no v1 equivalent):
+
+| Method | Description | Replaces |
+|--------|-------------|----------|
+| `ctx.mcpReq.log(level, data, logger?)` | Send log notification (respects client's level filter) | `server.sendLoggingMessage(...)` from within handler |
+| `ctx.mcpReq.elicitInput(params, options?)` | Elicit user input (form or URL) | `server.elicitInput(...)` from within handler |
+| `ctx.mcpReq.requestSampling(params, options?)` | Request LLM sampling from client | `server.createMessage(...)` from within handler |
+
+## 11. Client Behavioral Changes
 
 `Client.listPrompts()`, `listResources()`, `listResourceTemplates()`, `listTools()` now return empty results when the server lacks the corresponding capability (instead of sending the request). Set `enforceStrictCapabilities: true` in `ClientOptions` to throw an error instead.
 
-## 11. Runtime-Specific JSON Schema Validators (Enhancement)
+## 12. Runtime-Specific JSON Schema Validators (Enhancement)
 
 The SDK now auto-selects the appropriate JSON Schema validator based on runtime:
 - Node.js → `AjvJsonSchemaValidator` (no change from v1)
@@ -390,7 +420,7 @@ new McpServer({ name: 'server', version: '1.0.0' }, {});
 
 Access validators via `_shims` export: `import { DefaultJsonSchemaValidator } from '@modelcontextprotocol/server/_shims';`
 
-## 12. Migration Steps (apply in this order)
+## 13. Migration Steps (apply in this order)
 
 1. Update `package.json`: `npm uninstall @modelcontextprotocol/sdk`, install the appropriate v2 packages
 2. Replace all imports from `@modelcontextprotocol/sdk/...` using the import mapping tables (sections 3-4), including `StreamableHTTPServerTransport` → `NodeStreamableHTTPServerTransport`

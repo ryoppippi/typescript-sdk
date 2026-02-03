@@ -51,36 +51,18 @@ const getServer = () => {
                 name: z.string().describe('Name to greet')
             })
         },
-        async ({ name }, extra): Promise<CallToolResult> => {
+        async ({ name }, ctx): Promise<CallToolResult> => {
             const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
-            await server.sendLoggingMessage(
-                {
-                    level: 'debug',
-                    data: `Starting multi-greet for ${name}`
-                },
-                extra.sessionId
-            );
+            await ctx.mcpReq.log('debug', `Starting multi-greet for ${name}`);
 
             await sleep(1000); // Wait 1 second before first greeting
 
-            await server.sendLoggingMessage(
-                {
-                    level: 'info',
-                    data: `Sending first greeting to ${name}`
-                },
-                extra.sessionId
-            );
+            await ctx.mcpReq.log('info', `Sending first greeting to ${name}`);
 
             await sleep(1000); // Wait another second before second greeting
 
-            await server.sendLoggingMessage(
-                {
-                    level: 'info',
-                    data: `Sending second greeting to ${name}`
-                },
-                extra.sessionId
-            );
+            await ctx.mcpReq.log('info', `Sending second greeting to ${name}`);
 
             return {
                 content: [

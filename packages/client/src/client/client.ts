@@ -1,7 +1,9 @@
 import { DefaultJsonSchemaValidator } from '@modelcontextprotocol/client/_shims';
 import type {
+    BaseContext,
     CallToolRequest,
     ClientCapabilities,
+    ClientContext,
     ClientNotification,
     ClientRequest,
     ClientResult,
@@ -19,12 +21,12 @@ import type {
     ListResourceTemplatesRequest,
     ListToolsRequest,
     LoggingLevel,
+    MessageExtraInfo,
     Notification,
     NotificationMethod,
     ProtocolOptions,
     ReadResourceRequest,
     Request,
-    RequestHandlerExtra,
     RequestMethod,
     RequestOptions,
     RequestTypeMap,
@@ -215,7 +217,12 @@ export class Client<
     RequestT extends Request = Request,
     NotificationT extends Notification = Notification,
     ResultT extends Result = Result
-> extends Protocol<ClientRequest | RequestT, ClientNotification | NotificationT, ClientResult | ResultT> {
+> extends Protocol<
+    ClientRequest | RequestT,
+    ClientNotification | NotificationT,
+    ClientResult | ResultT,
+    ClientContext<ClientRequest | RequestT, ClientNotification | NotificationT>
+> {
     private _serverCapabilities?: ServerCapabilities;
     private _serverVersion?: Implementation;
     private _capabilities: ClientCapabilities;
@@ -245,6 +252,13 @@ export class Client<
         if (options?.listChanged) {
             this._pendingListChangedConfig = options.listChanged;
         }
+    }
+
+    protected override buildContext(
+        ctx: BaseContext<ClientRequest | RequestT, ClientNotification | NotificationT>,
+        _transportInfo?: MessageExtraInfo
+    ): ClientContext<ClientRequest | RequestT, ClientNotification | NotificationT> {
+        return ctx;
     }
 
     /**
@@ -312,13 +326,13 @@ export class Client<
         method: M,
         handler: (
             request: RequestTypeMap[M],
-            extra: RequestHandlerExtra<ClientRequest | RequestT, ClientNotification | NotificationT>
+            ctx: ClientContext<ClientRequest | RequestT, ClientNotification | NotificationT>
         ) => ClientResult | ResultT | Promise<ClientResult | ResultT>
     ): void {
         if (method === 'elicitation/create') {
             const wrappedHandler = async (
                 request: RequestTypeMap[M],
-                extra: RequestHandlerExtra<ClientRequest | RequestT, ClientNotification | NotificationT>
+                ctx: ClientContext<ClientRequest | RequestT, ClientNotification | NotificationT>
             ): Promise<ClientResult | ResultT> => {
                 const validatedRequest = parseSchema(ElicitRequestSchema, request);
                 if (!validatedRequest.success) {
@@ -340,7 +354,7 @@ export class Client<
                     throw new ProtocolError(ProtocolErrorCode.InvalidParams, 'Client does not support URL-mode elicitation requests');
                 }
 
-                const result = await Promise.resolve(handler(request, extra));
+                const result = await Promise.resolve(handler(request, ctx));
 
                 // When task creation is requested, validate and return CreateTaskResult
                 if (params.task) {
@@ -385,13 +399,13 @@ export class Client<
             };
 
             // Install the wrapped handler
-            return super.setRequestHandler(method, wrappedHandler as unknown as typeof handler);
+            return super.setRequestHandler(method, wrappedHandler);
         }
 
         if (method === 'sampling/createMessage') {
             const wrappedHandler = async (
                 request: RequestTypeMap[M],
-                extra: RequestHandlerExtra<ClientRequest | RequestT, ClientNotification | NotificationT>
+                ctx: ClientContext<ClientRequest | RequestT, ClientNotification | NotificationT>
             ): Promise<ClientResult | ResultT> => {
                 const validatedRequest = parseSchema(CreateMessageRequestSchema, request);
                 if (!validatedRequest.success) {
@@ -402,7 +416,7 @@ export class Client<
 
                 const { params } = validatedRequest.data;
 
-                const result = await Promise.resolve(handler(request, extra));
+                const result = await Promise.resolve(handler(request, ctx));
 
                 // When task creation is requested, validate and return CreateTaskResult
                 if (params.task) {
@@ -431,7 +445,7 @@ export class Client<
             };
 
             // Install the wrapped handler
-            return super.setRequestHandler(method, wrappedHandler as unknown as typeof handler);
+            return super.setRequestHandler(method, wrappedHandler);
         }
 
         // Other handlers use default behavior

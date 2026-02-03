@@ -6,11 +6,11 @@
 import type {
     AnySchema,
     CallToolResult,
-    CreateTaskRequestHandlerExtra,
     CreateTaskResult,
+    CreateTaskServerContext,
     GetTaskResult,
     Result,
-    TaskRequestHandlerExtra
+    TaskServerContext
 } from '@modelcontextprotocol/core';
 
 import type { BaseToolCallback } from '../../server/mcp.js';
@@ -25,7 +25,7 @@ import type { BaseToolCallback } from '../../server/mcp.js';
  */
 export type CreateTaskRequestHandler<SendResultT extends Result, Args extends AnySchema | undefined = undefined> = BaseToolCallback<
     SendResultT,
-    CreateTaskRequestHandlerExtra,
+    CreateTaskServerContext,
     Args
 >;
 
@@ -35,7 +35,7 @@ export type CreateTaskRequestHandler<SendResultT extends Result, Args extends An
  */
 export type TaskRequestHandler<SendResultT extends Result, Args extends AnySchema | undefined = undefined> = BaseToolCallback<
     SendResultT,
-    TaskRequestHandlerExtra,
+    TaskServerContext,
     Args
 >;
 
