@@ -13,7 +13,7 @@ import {
     SUPPORTED_PROTOCOL_VERSIONS
 } from '@modelcontextprotocol/core';
 import { InMemoryTaskStore, McpServer, Server } from '@modelcontextprotocol/server';
-import * as z4 from 'zod/v4';
+import * as z from 'zod/v4';
 
 /***
  * Test: Initialize with Matching Protocol Version
@@ -2266,7 +2266,7 @@ describe('Task-based execution', () => {
                 'test-tool',
                 {
                     description: 'A test tool',
-                    inputSchema: {}
+                    inputSchema: z.object({})
                 },
                 {
                     async createTask(_args, extra) {
@@ -2342,7 +2342,7 @@ describe('Task-based execution', () => {
                 'test-tool',
                 {
                     description: 'A test tool',
-                    inputSchema: {}
+                    inputSchema: z.object({})
                 },
                 {
                     async createTask(_args, extra) {
@@ -2419,7 +2419,7 @@ describe('Task-based execution', () => {
                 'test-tool',
                 {
                     description: 'A test tool',
-                    inputSchema: {}
+                    inputSchema: z.object({})
                 },
                 {
                     async createTask(_args, extra) {
@@ -2459,9 +2459,12 @@ describe('Task-based execution', () => {
 
             // Create a task using callToolStream to capture the task ID
             let taskId: string | undefined;
-            const stream = client.experimental.tasks.callToolStream({ name: 'test-tool', arguments: {} }, CallToolResultSchema, {
-                task: { ttl: 60_000 }
-            });
+            const stream = client.experimental.tasks.callToolStream(
+                { name: 'test-tool', arguments: {} },
+                {
+                    task: { ttl: 60_000 }
+                }
+            );
 
             for await (const message of stream) {
                 if (message.type === 'taskCreated') {
@@ -2500,7 +2503,7 @@ describe('Task-based execution', () => {
                 'test-tool',
                 {
                     description: 'A test tool',
-                    inputSchema: {}
+                    inputSchema: z.object({})
                 },
                 {
                     async createTask(_args, extra) {
@@ -2983,9 +2986,9 @@ describe('Task-based execution', () => {
             'test-tool',
             {
                 description: 'A test tool',
-                inputSchema: {
-                    id: z4.string()
-                }
+                inputSchema: z.object({
+                    id: z.string()
+                })
             },
             {
                 async createTask({ id }, extra) {
@@ -3253,7 +3256,7 @@ test('should respect server task capabilities', async () => {
         'test-tool',
         {
             description: 'A test tool',
-            inputSchema: {}
+            inputSchema: z.object({})
         },
         {
             async createTask(_args, extra) {

@@ -14,8 +14,8 @@ import type {
 } from '@modelcontextprotocol/core';
 import type { EventId, EventStore, StreamId } from '@modelcontextprotocol/server';
 import { McpServer } from '@modelcontextprotocol/server';
-import type { ZodMatrixEntry } from '@modelcontextprotocol/test-helpers';
-import { listenOnRandomPort, zodTestMatrix } from '@modelcontextprotocol/test-helpers';
+import { listenOnRandomPort } from '@modelcontextprotocol/test-helpers';
+import * as z from 'zod/v4';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import { NodeStreamableHTTPServerTransport } from '../src/streamableHttp.js';
@@ -148,7 +148,7 @@ function expectErrorResponse(
         expect((data as { error: { data?: string } }).error.data).toBeDefined();
     }
 }
-describe.each(zodTestMatrix)('$zodVersionLabel', (entry: ZodMatrixEntry) => {
+describe('Zod v4', () => {
     /**
      * Helper to create and start test HTTP server with MCP setup
      */
@@ -165,7 +165,7 @@ describe.each(zodTestMatrix)('$zodVersionLabel', (entry: ZodMatrixEntry) => {
             'greet',
             {
                 description: 'A simple greeting tool',
-                inputSchema: { name: z.string().describe('Name to greet') }
+                inputSchema: z.object({ name: z.string().describe('Name to greet') })
             },
             async ({ name }): Promise<CallToolResult> => {
                 return { content: [{ type: 'text', text: `Hello, ${name}!` }] };
@@ -212,7 +212,7 @@ describe.each(zodTestMatrix)('$zodVersionLabel', (entry: ZodMatrixEntry) => {
             'profile',
             {
                 description: 'A user profile data tool',
-                inputSchema: { active: z.boolean().describe('Profile status') }
+                inputSchema: z.object({ active: z.boolean().describe('Profile status') })
             },
             async ({ active }, { authInfo }): Promise<CallToolResult> => {
                 return { content: [{ type: 'text', text: `${active ? 'Active' : 'Inactive'} profile from token: ${authInfo?.token}!` }] };
@@ -248,7 +248,6 @@ describe.each(zodTestMatrix)('$zodVersionLabel', (entry: ZodMatrixEntry) => {
         return { server, transport, mcpServer, baseUrl };
     }
 
-    const { z } = entry;
     describe('NodeStreamableHTTPServerTransport', () => {
         let server: Server;
         let mcpServer: McpServer;
@@ -402,7 +401,7 @@ describe.each(zodTestMatrix)('$zodVersionLabel', (entry: ZodMatrixEntry) => {
                 'test-request-info',
                 {
                     description: 'A simple test tool with request info',
-                    inputSchema: { name: z.string().describe('Name to greet') }
+                    inputSchema: z.object({ name: z.string().describe('Name to greet') })
                 },
                 async ({ name }, { requestInfo }): Promise<CallToolResult> => {
                     // Convert Headers object to plain object for JSON serialization

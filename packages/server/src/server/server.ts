@@ -47,10 +47,10 @@ import {
     ListRootsResultSchema,
     LoggingLevelSchema,
     mergeCapabilities,
+    parseSchema,
     Protocol,
     ProtocolError,
     ProtocolErrorCode,
-    safeParse,
     SdkError,
     SdkErrorCode
 } from '@modelcontextprotocol/core';
@@ -143,7 +143,7 @@ export class Server<
                 const transportSessionId: string | undefined =
                     extra.sessionId || (extra.requestInfo?.headers.get('mcp-session-id') as string) || undefined;
                 const { level } = request.params;
-                const parseResult = LoggingLevelSchema.safeParse(level);
+                const parseResult = parseSchema(LoggingLevelSchema, level);
                 if (parseResult.success) {
                     this._loggingLevels.set(transportSessionId, parseResult.data);
                 }
@@ -207,7 +207,7 @@ export class Server<
                 request: RequestTypeMap[M],
                 extra: RequestHandlerExtra<ServerRequest | RequestT, ServerNotification | NotificationT>
             ): Promise<ServerResult | ResultT> => {
-                const validatedRequest = safeParse(CallToolRequestSchema, request);
+                const validatedRequest = parseSchema(CallToolRequestSchema, request);
                 if (!validatedRequest.success) {
                     const errorMessage =
                         validatedRequest.error instanceof Error ? validatedRequest.error.message : String(validatedRequest.error);
@@ -220,7 +220,7 @@ export class Server<
 
                 // When task creation is requested, validate and return CreateTaskResult
                 if (params.task) {
-                    const taskValidationResult = safeParse(CreateTaskResultSchema, result);
+                    const taskValidationResult = parseSchema(CreateTaskResultSchema, result);
                     if (!taskValidationResult.success) {
                         const errorMessage =
                             taskValidationResult.error instanceof Error
@@ -232,7 +232,7 @@ export class Server<
                 }
 
                 // For non-task requests, validate against CallToolResultSchema
-                const validationResult = safeParse(CallToolResultSchema, result);
+                const validationResult = parseSchema(CallToolResultSchema, result);
                 if (!validationResult.success) {
                     const errorMessage =
                         validationResult.error instanceof Error ? validationResult.error.message : String(validationResult.error);

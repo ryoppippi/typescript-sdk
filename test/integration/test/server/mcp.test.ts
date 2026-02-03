@@ -17,9 +17,8 @@ import {
     UrlElicitationRequiredError
 } from '@modelcontextprotocol/core';
 import { completable, McpServer, ResourceTemplate } from '@modelcontextprotocol/server';
-import type { ZodMatrixEntry } from '@modelcontextprotocol/test-helpers';
-import { zodTestMatrix } from '@modelcontextprotocol/test-helpers';
 import { afterEach, beforeEach, describe, expect, test } from 'vitest';
+import * as z from 'zod/v4';
 
 function createLatch() {
     let latch = false;
@@ -37,9 +36,7 @@ function createLatch() {
     };
 }
 
-describe.each(zodTestMatrix)('$zodVersionLabel', (entry: ZodMatrixEntry) => {
-    const { z } = entry;
-
+describe('Zod v4', () => {
     describe('McpServer', () => {
         /***
          * Test: Basic Server Instance
@@ -111,9 +108,9 @@ describe.each(zodTestMatrix)('$zodVersionLabel', (entry: ZodMatrixEntry) => {
                 'long-operation',
                 {
                     description: 'A long running operation with progress updates',
-                    inputSchema: {
+                    inputSchema: z.object({
                         steps: z.number().min(1).describe('Number of steps to perform')
-                    }
+                    })
                 },
                 async ({ steps }, { sendNotification, _meta }) => {
                     const progressToken = _meta?.progressToken;
@@ -406,9 +403,9 @@ describe.each(zodTestMatrix)('$zodVersionLabel', (entry: ZodMatrixEntry) => {
             const tool = mcpServer.registerTool(
                 'test',
                 {
-                    inputSchema: {
+                    inputSchema: z.object({
                         name: z.string()
-                    }
+                    })
                 },
                 async ({ name }) => ({
                     content: [
@@ -422,10 +419,10 @@ describe.each(zodTestMatrix)('$zodVersionLabel', (entry: ZodMatrixEntry) => {
 
             // Update the tool with a different schema
             tool.update({
-                paramsSchema: {
+                paramsSchema: z.object({
                     name: z.string(),
                     value: z.number()
-                },
+                }),
                 callback: async ({ name, value }) => ({
                     content: [
                         {
@@ -502,9 +499,9 @@ describe.each(zodTestMatrix)('$zodVersionLabel', (entry: ZodMatrixEntry) => {
             const tool = mcpServer.registerTool(
                 'test',
                 {
-                    outputSchema: {
+                    outputSchema: z.object({
                         result: z.number()
-                    }
+                    })
                 },
                 async () => ({
                     content: [{ type: 'text', text: '' }],
@@ -516,10 +513,10 @@ describe.each(zodTestMatrix)('$zodVersionLabel', (entry: ZodMatrixEntry) => {
 
             // Update the tool with a different outputSchema
             tool.update({
-                outputSchema: {
+                outputSchema: z.object({
                     result: z.number(),
                     sum: z.number()
-                },
+                }),
                 callback: async () => ({
                     content: [{ type: 'text', text: '' }],
                     structuredContent: {
@@ -648,7 +645,7 @@ describe.each(zodTestMatrix)('$zodVersionLabel', (entry: ZodMatrixEntry) => {
             mcpServer.registerTool(
                 'test',
                 {
-                    inputSchema: { name: z.string(), value: z.number() }
+                    inputSchema: z.object({ name: z.string(), value: z.number() })
                 },
                 async ({ name, value }) => ({
                     content: [{ type: 'text', text: `${name}: ${value}` }]
@@ -796,7 +793,7 @@ describe.each(zodTestMatrix)('$zodVersionLabel', (entry: ZodMatrixEntry) => {
             mcpServer.registerTool(
                 'test',
                 {
-                    inputSchema: { name: z.string() },
+                    inputSchema: z.object({ name: z.string() }),
                     annotations: { title: 'Test Tool', readOnlyHint: true }
                 },
                 async ({ name }) => ({
@@ -839,7 +836,7 @@ describe.each(zodTestMatrix)('$zodVersionLabel', (entry: ZodMatrixEntry) => {
                 'test',
                 {
                     description: 'A tool with everything',
-                    inputSchema: { name: z.string() },
+                    inputSchema: z.object({ name: z.string() }),
                     annotations: {
                         title: 'Complete Test Tool',
                         readOnlyHint: true,
@@ -935,10 +932,10 @@ describe.each(zodTestMatrix)('$zodVersionLabel', (entry: ZodMatrixEntry) => {
             mcpServer.registerTool(
                 'test',
                 {
-                    inputSchema: {
+                    inputSchema: z.object({
                         name: z.string(),
                         value: z.number()
-                    }
+                    })
                 },
                 async ({ name, value }) => ({
                     content: [
@@ -1044,14 +1041,14 @@ describe.each(zodTestMatrix)('$zodVersionLabel', (entry: ZodMatrixEntry) => {
                 'test',
                 {
                     description: 'Test tool with structured output',
-                    inputSchema: {
+                    inputSchema: z.object({
                         input: z.string()
-                    },
-                    outputSchema: {
+                    }),
+                    outputSchema: z.object({
                         processedInput: z.string(),
                         resultType: z.string(),
                         timestamp: z.string()
-                    }
+                    })
                 },
                 async ({ input }) => ({
                     structuredContent: {
@@ -1146,13 +1143,13 @@ describe.each(zodTestMatrix)('$zodVersionLabel', (entry: ZodMatrixEntry) => {
                 'test',
                 {
                     description: 'Test tool with output schema but missing structured content',
-                    inputSchema: {
+                    inputSchema: z.object({
                         input: z.string()
-                    },
-                    outputSchema: {
+                    }),
+                    outputSchema: z.object({
                         processedInput: z.string(),
                         resultType: z.string()
-                    }
+                    })
                 },
                 async ({ input }) => ({
                     // Only return content without structuredContent
@@ -1207,13 +1204,13 @@ describe.each(zodTestMatrix)('$zodVersionLabel', (entry: ZodMatrixEntry) => {
                 'test',
                 {
                     description: 'Test tool with output schema but missing structured content',
-                    inputSchema: {
+                    inputSchema: z.object({
                         input: z.string()
-                    },
-                    outputSchema: {
+                    }),
+                    outputSchema: z.object({
                         processedInput: z.string(),
                         resultType: z.string()
-                    }
+                    })
                 },
                 async ({ input }) => ({
                     content: [
@@ -1267,14 +1264,14 @@ describe.each(zodTestMatrix)('$zodVersionLabel', (entry: ZodMatrixEntry) => {
                 'test',
                 {
                     description: 'Test tool with invalid structured output',
-                    inputSchema: {
+                    inputSchema: z.object({
                         input: z.string()
-                    },
-                    outputSchema: {
+                    }),
+                    outputSchema: z.object({
                         processedInput: z.string(),
                         resultType: z.string(),
                         timestamp: z.string()
-                    }
+                    })
                 },
                 async ({ input }) => ({
                     content: [
@@ -1490,9 +1487,9 @@ describe.each(zodTestMatrix)('$zodVersionLabel', (entry: ZodMatrixEntry) => {
                 'test',
                 {
                     description: 'Test tool',
-                    inputSchema: {
+                    inputSchema: z.object({
                         input: z.string()
-                    }
+                    })
                 },
                 async ({ input }) => ({
                     content: [
@@ -1696,7 +1693,7 @@ describe.each(zodTestMatrix)('$zodVersionLabel', (entry: ZodMatrixEntry) => {
                 'test-with-meta',
                 {
                     description: 'A tool with _meta field',
-                    inputSchema: { name: z.string() },
+                    inputSchema: z.object({ name: z.string() }),
                     _meta: metaData
                 },
                 async ({ name }) => ({
@@ -1733,7 +1730,7 @@ describe.each(zodTestMatrix)('$zodVersionLabel', (entry: ZodMatrixEntry) => {
                 'test-without-meta',
                 {
                     description: 'A tool without _meta field',
-                    inputSchema: { name: z.string() }
+                    inputSchema: z.object({ name: z.string() })
                 },
                 async ({ name }) => ({
                     content: [{ type: 'text', text: `Hello, ${name}!` }]
@@ -1784,7 +1781,7 @@ describe.each(zodTestMatrix)('$zodVersionLabel', (entry: ZodMatrixEntry) => {
                 'task-tool',
                 {
                     description: 'A tool with task support',
-                    inputSchema: { input: z.string() },
+                    inputSchema: z.object({ input: z.string() }),
                     execution: {
                         taskSupport: 'required'
                     }
@@ -1853,7 +1850,7 @@ describe.each(zodTestMatrix)('$zodVersionLabel', (entry: ZodMatrixEntry) => {
                 'optional-task-tool',
                 {
                     description: 'A tool with optional task support',
-                    inputSchema: { input: z.string() },
+                    inputSchema: z.object({ input: z.string() }),
                     execution: {
                         taskSupport: 'optional'
                     }
@@ -3034,9 +3031,9 @@ describe.each(zodTestMatrix)('$zodVersionLabel', (entry: ZodMatrixEntry) => {
             const prompt = mcpServer.registerPrompt(
                 'test',
                 {
-                    argsSchema: {
+                    argsSchema: z.object({
                         name: z.string()
-                    }
+                    })
                 },
                 async ({ name }) => ({
                     messages: [
@@ -3053,10 +3050,10 @@ describe.each(zodTestMatrix)('$zodVersionLabel', (entry: ZodMatrixEntry) => {
 
             // Update the prompt with a different schema
             prompt.update({
-                argsSchema: {
+                argsSchema: z.object({
                     name: z.string(),
                     value: z.string()
-                },
+                }),
                 callback: async ({ name, value }) => ({
                     messages: [
                         {
@@ -3260,10 +3257,10 @@ describe.each(zodTestMatrix)('$zodVersionLabel', (entry: ZodMatrixEntry) => {
             mcpServer.registerPrompt(
                 'test',
                 {
-                    argsSchema: {
+                    argsSchema: z.object({
                         name: z.string(),
                         value: z.string()
-                    }
+                    })
                 },
                 async ({ name, value }) => ({
                     messages: [
@@ -3355,10 +3352,10 @@ describe.each(zodTestMatrix)('$zodVersionLabel', (entry: ZodMatrixEntry) => {
             mcpServer.registerPrompt(
                 'test',
                 {
-                    argsSchema: {
+                    argsSchema: z.object({
                         name: z.string(),
                         value: z.string().min(3)
-                    }
+                    })
                 },
                 async ({ name, value }) => ({
                     messages: [
@@ -3476,7 +3473,7 @@ describe.each(zodTestMatrix)('$zodVersionLabel', (entry: ZodMatrixEntry) => {
             });
 
             // This should succeed
-            mcpServer.registerPrompt('echo', { argsSchema: { message: z.string() } }, ({ message }) => ({
+            mcpServer.registerPrompt('echo', { argsSchema: z.object({ message: z.string() }) }, ({ message }) => ({
                 messages: [
                     {
                         role: 'user',
@@ -3521,7 +3518,7 @@ describe.each(zodTestMatrix)('$zodVersionLabel', (entry: ZodMatrixEntry) => {
             // Register a prompt with completion
             mcpServer.registerPrompt(
                 'echo',
-                { argsSchema: { message: completable(z.string(), () => ['hello', 'world']) } },
+                { argsSchema: z.object({ message: completable(z.string(), () => ['hello', 'world']) }) },
                 ({ message }) => ({
                     messages: [
                         {
@@ -3595,9 +3592,9 @@ describe.each(zodTestMatrix)('$zodVersionLabel', (entry: ZodMatrixEntry) => {
             mcpServer.registerPrompt(
                 'test-prompt',
                 {
-                    argsSchema: {
+                    argsSchema: z.object({
                         name: z.string()
-                    }
+                    })
                 },
                 async ({ name }) => ({
                     messages: [
@@ -3637,9 +3634,9 @@ describe.each(zodTestMatrix)('$zodVersionLabel', (entry: ZodMatrixEntry) => {
             mcpServer.registerPrompt(
                 'test-prompt',
                 {
-                    argsSchema: {
+                    argsSchema: z.object({
                         name: completable(z.string(), () => ['Alice', 'Bob', 'Charlie'])
-                    }
+                    })
                 },
                 async ({ name }) => ({
                     messages: [
@@ -3678,9 +3675,9 @@ describe.each(zodTestMatrix)('$zodVersionLabel', (entry: ZodMatrixEntry) => {
             mcpServer.registerPrompt(
                 'test-prompt',
                 {
-                    argsSchema: {
+                    argsSchema: z.object({
                         name: completable(z.string(), () => ['Alice', 'Bob', 'Charlie'])
-                    }
+                    })
                 },
                 async ({ name }) => ({
                     messages: [
@@ -3737,9 +3734,9 @@ describe.each(zodTestMatrix)('$zodVersionLabel', (entry: ZodMatrixEntry) => {
             mcpServer.registerPrompt(
                 'test-prompt',
                 {
-                    argsSchema: {
+                    argsSchema: z.object({
                         name: completable(z.string(), test => ['Alice', 'Bob', 'Charlie'].filter(value => value.startsWith(test)))
-                    }
+                    })
                 },
                 async ({ name }) => ({
                     messages: [
@@ -3984,9 +3981,9 @@ describe.each(zodTestMatrix)('$zodVersionLabel', (entry: ZodMatrixEntry) => {
             mcpServer.registerPrompt(
                 'test-prompt',
                 {
-                    argsSchema: {
+                    argsSchema: z.object({
                         name: z.string().optional()
-                    }
+                    })
                 },
                 () => ({
                     messages: []
@@ -4287,7 +4284,7 @@ describe.each(zodTestMatrix)('$zodVersionLabel', (entry: ZodMatrixEntry) => {
                 {
                     title: 'Team Greeting',
                     description: 'Generate a greeting for team members',
-                    argsSchema: {
+                    argsSchema: z.object({
                         department: completable(z.string(), value => {
                             return ['engineering', 'sales', 'marketing', 'support'].filter(d => d.startsWith(value));
                         }),
@@ -4307,7 +4304,7 @@ describe.each(zodTestMatrix)('$zodVersionLabel', (entry: ZodMatrixEntry) => {
                             }
                             return ['Guest'].filter(n => n.startsWith(value));
                         })
-                    }
+                    })
                 },
                 async ({ department, name }) => ({
                     messages: [
@@ -4444,11 +4441,11 @@ describe.each(zodTestMatrix)('$zodVersionLabel', (entry: ZodMatrixEntry) => {
             mcpServer.registerTool(
                 'book-restaurant',
                 {
-                    inputSchema: {
+                    inputSchema: z.object({
                         restaurant: z.string(),
                         date: z.string(),
                         partySize: z.number()
-                    }
+                    })
                 },
                 async ({ restaurant, date, partySize }) => {
                     // Check availability
@@ -5577,7 +5574,7 @@ describe.each(zodTestMatrix)('$zodVersionLabel', (entry: ZodMatrixEntry) => {
                 {
                     title: 'Team Greeting',
                     description: 'Generate a greeting for team members',
-                    argsSchema: {
+                    argsSchema: z.object({
                         department: completable(z.string(), value => {
                             return ['engineering', 'sales', 'marketing', 'support'].filter(d => d.startsWith(value));
                         }),
@@ -5597,7 +5594,7 @@ describe.each(zodTestMatrix)('$zodVersionLabel', (entry: ZodMatrixEntry) => {
                             }
                             return ['Guest'].filter(n => n.startsWith(value));
                         })
-                    }
+                    })
                 },
                 async ({ department, name }) => ({
                     messages: [
@@ -5734,11 +5731,11 @@ describe.each(zodTestMatrix)('$zodVersionLabel', (entry: ZodMatrixEntry) => {
             mcpServer.registerTool(
                 'book-restaurant',
                 {
-                    inputSchema: {
+                    inputSchema: z.object({
                         restaurant: z.string(),
                         date: z.string(),
                         partySize: z.number()
-                    }
+                    })
                 },
                 async ({ restaurant, date, partySize }) => {
                     // Check availability
@@ -6214,9 +6211,9 @@ describe.each(zodTestMatrix)('$zodVersionLabel', (entry: ZodMatrixEntry) => {
                 'long-running-task',
                 {
                     description: 'A long running task',
-                    inputSchema: {
+                    inputSchema: z.object({
                         input: z.string()
-                    },
+                    }),
                     execution: {
                         taskSupport: 'required'
                     }
@@ -6319,9 +6316,9 @@ describe.each(zodTestMatrix)('$zodVersionLabel', (entry: ZodMatrixEntry) => {
                 'optional-task',
                 {
                     description: 'An optional task',
-                    inputSchema: {
+                    inputSchema: z.object({
                         value: z.number()
-                    },
+                    }),
                     execution: {
                         taskSupport: 'optional'
                     }
@@ -6427,9 +6424,9 @@ describe.each(zodTestMatrix)('$zodVersionLabel', (entry: ZodMatrixEntry) => {
                 'task-tool',
                 {
                     description: 'A task tool',
-                    inputSchema: {
+                    inputSchema: z.object({
                         data: z.string()
-                    },
+                    }),
                     execution: {
                         taskSupport: 'required'
                     }
@@ -6737,9 +6734,9 @@ describe.each(zodTestMatrix)('$zodVersionLabel', (entry: ZodMatrixEntry) => {
                     'invalid-task',
                     {
                         description: 'A task with forbidden support',
-                        inputSchema: {
+                        inputSchema: z.object({
                             input: z.string()
-                        },
+                        }),
                         execution: {
                             taskSupport: 'forbidden' as unknown as 'required'
                         }

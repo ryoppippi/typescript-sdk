@@ -200,7 +200,7 @@ function createMcpServer() {
         'test_tool_with_logging',
         {
             description: 'Tests tool that emits log messages during execution',
-            inputSchema: {}
+            inputSchema: z.object({})
         },
         async (_args, extra): Promise<CallToolResult> => {
             await extra.sendNotification({
@@ -239,7 +239,7 @@ function createMcpServer() {
         'test_tool_with_progress',
         {
             description: 'Tests tool that reports progress notifications',
-            inputSchema: {}
+            inputSchema: z.object({})
         },
         async (_args, extra): Promise<CallToolResult> => {
             const progressToken = extra._meta?.progressToken ?? 0;
@@ -299,7 +299,7 @@ function createMcpServer() {
         {
             description:
                 'Tests SSE stream disconnection and client reconnection (SEP-1699). Server will close the stream mid-call and send the result after client reconnects.',
-            inputSchema: {}
+            inputSchema: z.object({})
         },
         async (_args, extra): Promise<CallToolResult> => {
             const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
@@ -335,9 +335,9 @@ function createMcpServer() {
         'test_sampling',
         {
             description: 'Tests server-initiated sampling (LLM completion request)',
-            inputSchema: {
+            inputSchema: z.object({
                 prompt: z.string().describe('The prompt to send to the LLM')
-            }
+            })
         },
         async (args: { prompt: string }, extra): Promise<CallToolResult> => {
             try {
@@ -389,9 +389,9 @@ function createMcpServer() {
         'test_elicitation',
         {
             description: 'Tests server-initiated elicitation (user input request)',
-            inputSchema: {
+            inputSchema: z.object({
                 message: z.string().describe('The message to show the user')
-            }
+            })
         },
         async (args: { message: string }, extra): Promise<CallToolResult> => {
             try {
@@ -443,7 +443,7 @@ function createMcpServer() {
         'test_elicitation_sep1034_defaults',
         {
             description: 'Tests elicitation with default values per SEP-1034',
-            inputSchema: {}
+            inputSchema: z.object({})
         },
         async (_args, extra): Promise<CallToolResult> => {
             try {
@@ -517,7 +517,7 @@ function createMcpServer() {
         'test_elicitation_sep1330_enums',
         {
             description: 'Tests elicitation with enum schema improvements per SEP-1330',
-            inputSchema: {}
+            inputSchema: z.object({})
         },
         async (_args, extra): Promise<CallToolResult> => {
             try {
@@ -613,7 +613,7 @@ function createMcpServer() {
         'json_schema_2020_12_tool',
         {
             description: 'Tool with JSON Schema 2020-12 features for conformance testing (SEP-1613)',
-            inputSchema: {
+            inputSchema: z.object({
                 name: z.string().optional(),
                 address: z
                     .object({
@@ -621,7 +621,7 @@ function createMcpServer() {
                         city: z.string().optional()
                     })
                     .optional()
-            }
+            })
         },
         async (args: { name?: string; address?: { street?: string; city?: string } }): Promise<CallToolResult> => {
             return {
@@ -775,10 +775,10 @@ function createMcpServer() {
         {
             title: 'Prompt With Arguments',
             description: 'A prompt with required arguments',
-            argsSchema: {
+            argsSchema: z.object({
                 arg1: z.string().describe('First test argument'),
                 arg2: z.string().describe('Second test argument')
-            }
+            })
         },
         async (args: { arg1: string; arg2: string }): Promise<GetPromptResult> => {
             return {
@@ -801,9 +801,9 @@ function createMcpServer() {
         {
             title: 'Prompt With Embedded Resource',
             description: 'A prompt that includes an embedded resource',
-            argsSchema: {
+            argsSchema: z.object({
                 resourceUri: z.string().describe('URI of the resource to embed')
-            }
+            })
         },
         async (args: { resourceUri: string }): Promise<GetPromptResult> => {
             return {

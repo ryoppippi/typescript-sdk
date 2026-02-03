@@ -10,7 +10,6 @@ import type {
     CallToolRequest,
     CancelTaskResult,
     ClientRequest,
-    CompatibilityCallToolResultSchema,
     GetTaskResult,
     ListTasksResult,
     Notification,
@@ -92,11 +91,10 @@ export class ExperimentalClientTasks<
      *
      * @experimental
      */
-    async *callToolStream<T extends typeof CallToolResultSchema | typeof CompatibilityCallToolResultSchema>(
+    async *callToolStream(
         params: CallToolRequest['params'],
-        resultSchema: T = CallToolResultSchema as T,
         options?: RequestOptions
-    ): AsyncGenerator<ResponseMessage<SchemaOutput<T>>, void, void> {
+    ): AsyncGenerator<ResponseMessage<SchemaOutput<typeof CallToolResultSchema>>, void, void> {
         // Access Client's internal methods
         const clientInternal = this._client as unknown as ClientInternal<RequestT>;
 
@@ -108,7 +106,7 @@ export class ExperimentalClientTasks<
             task: options?.task ?? (clientInternal.isToolTask(params.name) ? {} : undefined)
         };
 
-        const stream = clientInternal.requestStream({ method: 'tools/call', params }, resultSchema, optionsWithTask);
+        const stream = clientInternal.requestStream({ method: 'tools/call', params }, CallToolResultSchema, optionsWithTask);
 
         // Get the validator for this tool (if it has an output schema)
         const validator = clientInternal.getToolOutputValidator(params.name);
