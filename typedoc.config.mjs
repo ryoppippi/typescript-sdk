@@ -22,6 +22,7 @@ console.log(
     publicPackages.map(p => p.manifest.name)
 );
 
+/** @type {Partial<import("typedoc").TypeDocOptions>} */
 export default {
     name: 'MCP TypeScript SDK',
     entryPointStrategy: 'packages',
@@ -36,5 +37,6 @@ export default {
     },
     headings: {
         readme: false
-    }
+    },
+    out: 'tmp/docs/',
 };
