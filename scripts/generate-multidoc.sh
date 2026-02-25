@@ -5,9 +5,6 @@
 # V1 docs (from the v1.x branch) are placed at the root.
 # V2 docs (from main) are placed under /v2/.
 #
-# This script can be run from any branch — it fetches both v1.x and main
-# via git worktrees.
-#
 # Usage:
 #   scripts/generate-multidoc.sh [output-dir]
 #
@@ -76,7 +73,7 @@ cat > typedoc.json << 'TYPEDOC_EOF'
     "docs/faq.md"
   ],
   "navigationLinks": {
-    "V2 Docs": "/typescript-sdk/v2/"
+    "V2 Docs": "/v2/"
   },
   "headings": {
     "readme": false
