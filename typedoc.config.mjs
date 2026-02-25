@@ -24,7 +24,7 @@ console.log(
 
 /** @type {Partial<import("typedoc").TypeDocOptions>} */
 export default {
-    name: 'MCP TypeScript SDK',
+    name: 'MCP TypeScript SDK (V2)',
     entryPointStrategy: 'packages',
     entryPoints,
     packageOptions: {
@@ -33,6 +33,9 @@ export default {
     },
     highlightLanguages: [...OptionDefaults.highlightLanguages, 'powershell'],
     projectDocuments: ['docs/documents.md'],
+    navigationLinks: {
+        'V1 Docs': '/'
+    },
     navigation: {
         compactFolders: true,
         includeFolders: false
@@ -40,6 +43,7 @@ export default {
     headings: {
         readme: false
     },
+    customJs: 'docs/v2-banner.js',
     treatWarningsAsErrors: true,
     out: 'tmp/docs/',
 };
