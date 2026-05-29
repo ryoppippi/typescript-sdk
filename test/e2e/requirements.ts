@@ -10,7 +10,7 @@
 import type { Requirement } from './types.js';
 
 /** Transports with a persistent server instance / standalone notification stream. */
-const STATEFUL_TRANSPORTS = ['inMemory', 'stdio', 'streamableHttp'] as const;
+const STATEFUL_TRANSPORTS = ['inMemory', 'stdio', 'streamableHttp', 'sse'] as const;
 
 export const REQUIREMENTS: Record<string, Requirement> = {
     // Lifecycle & version negotiation
@@ -178,11 +178,23 @@ export const REQUIREMENTS: Record<string, Requirement> = {
     'protocol:progress:callback': {
         source: 'https://modelcontextprotocol.io/specification/2025-11-25/basic/utilities/progress#progress-flow',
         behavior:
-            "Progress notifications emitted by a handler during a request are delivered to the caller's progress callback, in order, with their progress, total, and message."
+            "Progress notifications emitted by a handler during a request are delivered to the caller's progress callback, in order, with their progress, total, and message.",
+        knownFailures: [
+            {
+                transport: 'sse',
+                note: "Real-socket SSE delivers a handler's progress notifications and its response in one batch; the response is processed first, so the progress notifications never reach the caller's progress callback."
+            }
+        ]
     },
     'typescript:protocol:progress:token-injected': {
         source: 'sdk',
-        behavior: 'Passing onprogress causes a progressToken to be injected into request _meta, preserving existing _meta fields.'
+        behavior: 'Passing onprogress causes a progressToken to be injected into request _meta, preserving existing _meta fields.',
+        knownFailures: [
+            {
+                transport: 'sse',
+                note: "Real-socket SSE delivers a handler's progress notifications and its response in one batch; the response is processed first, so the progress notifications never reach the caller's progress callback."
+            }
+        ]
     },
     'protocol:progress:token-unique': {
         source: 'https://modelcontextprotocol.io/specification/2025-11-25/basic/utilities/progress#progress-flow',
@@ -198,7 +210,13 @@ export const REQUIREMENTS: Record<string, Requirement> = {
     },
     'protocol:timeout:reset-on-progress': {
         source: 'https://modelcontextprotocol.io/specification/2025-11-25/basic/lifecycle#timeouts',
-        behavior: "When configured to do so, each progress notification resets the request's read timeout."
+        behavior: "When configured to do so, each progress notification resets the request's read timeout.",
+        knownFailures: [
+            {
+                transport: 'sse',
+                note: 'Same real-socket SSE batching race as protocol:progress:callback: the progress notifications are dropped before they can reset the timeout, so the request times out.'
+            }
+        ]
     },
     'protocol:timeout:sends-cancellation': {
         source: 'https://modelcontextprotocol.io/specification/2025-11-25/basic/lifecycle#timeouts',
@@ -298,7 +316,13 @@ export const REQUIREMENTS: Record<string, Requirement> = {
     },
     'tools:call:progress': {
         source: 'https://modelcontextprotocol.io/specification/2025-11-25/basic/utilities/progress#progress-flow',
-        behavior: "Progress notifications emitted by a tool handler reach the caller's progress callback before the tool result returns."
+        behavior: "Progress notifications emitted by a tool handler reach the caller's progress callback before the tool result returns.",
+        knownFailures: [
+            {
+                transport: 'sse',
+                note: "Real-socket SSE delivers a handler's progress notifications and its response in one batch; the response is processed first, so the progress notifications never reach the caller's progress callback."
+            }
+        ]
     },
     'tools:call:sampling-roundtrip': {
         transports: STATEFUL_TRANSPORTS,
@@ -2578,6 +2602,127 @@ export const REQUIREMENTS: Record<string, Requirement> = {
             'When a task-augmented tool call fails, the failure is stored with status failed and a subsequent tasks/result request for that task returns the stored error result instead of losing it.',
         transports: STATEFUL_TRANSPORTS,
         note: 'Task polling and result retrieval need the same server instance across requests, which stateless hosting does not provide.'
+    },
+    // Consumer-contract additions (sourced from real SDK dependents)
+    'client-transport:http:error-status-code': {
+        source: 'sdk',
+        behavior:
+            'When a Streamable HTTP POST or connect receives a non-OK response, the transport rejects with an SdkHttpError whose .status property is the HTTP status code so callers can branch on 401/403/404/4xx.',
+        transports: ['streamableHttp'],
+        note: 'This exercises the Streamable HTTP client transport directly; the matrix transport arg is ignored, so it runs as a single streamableHttp-labelled cell to avoid duplicate runs.'
+    },
+    'typescript:protocol:error:not-connected': {
+        source: 'sdk',
+        behavior:
+            "Calling a request method on a Client whose transport is closed or never connected rejects with an Error containing 'Not connected', and client.transport is undefined before connect and after close.",
+        knownFailures: [
+            {
+                note: "changed in v2: capability-lenient list methods resolve with an empty result before connect instead of rejecting 'Not connected'; the after-close rejection still behaves as required."
+            }
+        ]
+    },
+    'typescript:client-transport:http:session-id-property': {
+        source: 'sdk',
+        behavior:
+            'StreamableHTTPClientTransport exposes the negotiated session id via a readable .sessionId property after initialization so consumers can persist and display it.',
+        transports: ['streamableHttp'],
+        note: 'This exercises the Streamable HTTP client transport directly; the matrix transport arg is ignored, so it runs as a single streamableHttp-labelled cell to avoid duplicate runs.'
+    },
+    'typescript:client-transport:http:session-id-option': {
+        source: 'sdk',
+        behavior:
+            'A sessionId passed to the StreamableHTTPClientTransport constructor is sent as the Mcp-Session-Id header from the first request onwards.',
+        transports: ['streamableHttp'],
+        note: 'This exercises the Streamable HTTP client transport directly; the matrix transport arg is ignored, so it runs as a single streamableHttp-labelled cell to avoid duplicate runs.'
+    },
+    'client-transport:http:reconnect-failure-onerror': {
+        source: 'sdk',
+        behavior:
+            'When the SSE stream drops and automatic reconnection ultimately fails, the failure is delivered to the transport onerror callback rather than throwing out of an unrelated request.',
+        transports: ['streamableHttp'],
+        note: 'This exercises the Streamable HTTP client transport directly; the matrix transport arg is ignored, so it runs as a single streamableHttp-labelled cell to avoid duplicate runs.'
+    },
+    'transport:standalone:raw-relay': {
+        source: 'sdk',
+        behavior:
+            'Client and server transports can be driven directly (start/send/onmessage/onclose/onerror) without wrapping them in a Client or Server, supporting message-relay proxies.'
+    },
+    'transport:custom:client-connect': {
+        source: 'sdk',
+        behavior:
+            'Client.connect accepts any consumer-implemented object satisfying the Transport interface and completes the handshake over it.',
+        transports: ['inMemory'],
+        note: 'The test supplies its own custom Transport implementation, so the matrix transport arg is ignored; it runs as a single inMemory-labelled cell to avoid duplicate runs.'
+    },
+    'protocol:transport-callbacks:wrappable-after-connect': {
+        source: 'sdk',
+        behavior:
+            'Consumers can wrap or replace transport.onmessage/onclose/onerror after Client.connect without breaking protocol dispatch, because the Protocol layer assigns its handlers at connect time and tolerates chaining.'
+    },
+    'transport:stdio:pre-started-tolerated': {
+        source: 'sdk',
+        behavior:
+            'Client.connect succeeds (or fails with a recognizable already-started error that consumers can ignore) when the StdioClientTransport was started before being passed to connect.',
+        transports: ['stdio'],
+        note: 'Spawn-based test against the real StdioClientTransport child process; only meaningful on stdio.'
+    },
+    'client-auth:auth-helper:result-values': {
+        source: 'sdk',
+        behavior:
+            "The auth() helper resolves to the literal string 'REDIRECT' when user authorization is required and 'AUTHORIZED' when tokens were obtained, and consumers branch on these exact values.",
+        transports: ['streamableHttp'],
+        note: 'This exercises the HTTP hosting/auth layer; the matrix transport arg is ignored, so it runs as a single streamableHttp-labelled cell to avoid duplicate runs.'
+    },
+    'client-auth:refresh:typed-errors': {
+        source: 'sdk',
+        behavior:
+            'Token refresh and authorization-code exchange failures surface as typed OAuth error classes (e.g. InvalidGrantError, InvalidClientError, ServerError) so consumers can decide between re-auth and hard failure.',
+        transports: ['streamableHttp'],
+        note: 'This exercises the HTTP hosting/auth layer; the matrix transport arg is ignored, so it runs as a single streamableHttp-labelled cell to avoid duplicate runs.',
+        knownFailures: [
+            {
+                note: 'changed in v2: the per-code OAuth error subclasses were consolidated into the single OAuthError class (carrying the machine-readable code), so refresh and exchange rejections are OAuthError rather than InvalidGrantError, InvalidClientError, ServerError, etc.'
+            }
+        ]
+    },
+    'client-auth:no-tokens:no-auth-header': {
+        source: 'sdk',
+        behavior:
+            "When the OAuth provider's tokens() returns undefined the transport sends no Authorization header and the resulting 401 re-enters the auth flow, and a token response without refresh_token leads back to a full authorization-code flow on expiry rather than a refresh attempt.",
+        transports: ['streamableHttp'],
+        note: 'This exercises the HTTP hosting/auth layer; the matrix transport arg is ignored, so it runs as a single streamableHttp-labelled cell to avoid duplicate runs.'
+    },
+    'client-transport:sse:401-unauthorized-code': {
+        source: 'sdk',
+        behavior:
+            'The legacy SSEClientTransport surfaces a 401 response as an SseError with code === 401 (and supports finishAuth) with the same auth-retry semantics as the Streamable HTTP transport.',
+        transports: ['streamableHttp'],
+        note: 'This exercises the legacy SSE client transport against an in-process fixture; the matrix transport arg is ignored, so it runs as a single streamableHttp-labelled cell to avoid duplicate runs.'
+    },
+    'mcpserver:tool:metadata-roundtrip': {
+        source: 'sdk',
+        behavior:
+            'Tool metadata supplied to registerTool (title, annotations, _meta, icons) is returned verbatim in tools/list results to connected clients.'
+    },
+    'hosting:session:lifecycle-callbacks': {
+        source: 'sdk',
+        behavior:
+            'StreamableHTTPServerTransport invokes onsessioninitialized with the new session id after initialization and onsessionclosed when the client issues DELETE, allowing hosts to maintain a session-to-transport map.',
+        transports: ['streamableHttp'],
+        note: 'This exercises the HTTP hosting layer and session management; the matrix transport arg is ignored, so it runs as a single streamableHttp-labelled cell to avoid duplicate runs.'
+    },
+    // Legacy SSE
+    'transport:sse:server-transport': {
+        source: 'sdk',
+        behavior:
+            'The SDK provides a server-side legacy HTTP+SSE transport so existing SSE deployments can be hosted on SDK components alone.',
+        transports: ['sse'],
+        note: 'This asserts the availability of the server half of the legacy SSE transport; the matrix transport arg is ignored, so it runs as a single sse-labelled cell.',
+        knownFailures: [
+            {
+                note: 'changed in v2: the server-side SSE transport was removed from the SDK; only the client-side SSEClientTransport remains, so the e2e sse column is hosted by a test-only bridge.'
+            }
+        ]
     }
 } satisfies Record<string, Requirement>;
 
