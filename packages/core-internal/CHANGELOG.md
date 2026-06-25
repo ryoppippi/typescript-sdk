@@ -1,4 +1,4 @@
-# @modelcontextprotocol/core
+# @modelcontextprotocol/core-internal
 
 ## 2.0.0-alpha.1
 
@@ -42,7 +42,7 @@
     For raw JSON Schema (e.g. TypeBox output), use the new `fromJsonSchema` adapter:
 
     ```typescript
-    import { fromJsonSchema, AjvJsonSchemaValidator } from '@modelcontextprotocol/core';
+    import { fromJsonSchema, AjvJsonSchemaValidator } from '@modelcontextprotocol/core-internal';
 
     server.registerTool(
         'greet',
@@ -55,7 +55,8 @@
 
     **Breaking changes:**
     - `experimental.tasks.getTaskResult()` no longer accepts a `resultSchema` parameter. Returns `GetTaskPayloadResult` (a loose `Result`); cast to the expected type at the call site.
-    - Removed unused exports from `@modelcontextprotocol/core`: `SchemaInput`, `schemaToJson`, `parseSchemaAsync`, `getSchemaShape`, `getSchemaDescription`, `isOptionalSchema`, `unwrapOptionalSchema`. Use the new `standardSchemaToJsonSchema` and `validateStandardSchema` instead.
+    - Removed unused exports from `@modelcontextprotocol/core-internal`: `SchemaInput`, `schemaToJson`, `parseSchemaAsync`, `getSchemaShape`, `getSchemaDescription`, `isOptionalSchema`, `unwrapOptionalSchema`. Use the new `standardSchemaToJsonSchema` and `validateStandardSchema`
+      instead.
     - `completable()` remains Zod-specific (it relies on Zod's `.shape` introspection).
 
 ### Patch Changes
