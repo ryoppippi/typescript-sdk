@@ -68,10 +68,10 @@ bracket access → `.get()`; sending plain-record headers keeps working), OAuth
 error-class consolidation (`instanceof InvalidGrantError` → `OAuthError` +
 `OAuthErrorCode`), per-scenario `SdkErrorCode` branch selection, `ctx.mcpReq.send()`
 schema-arg drop, and behavioral adaptation are manual — see the
-[migration guide](../../docs/migration/upgrade-to-v2.md) for what to do after the
+[migration guide](https://ts.sdk.modelcontextprotocol.io/v2/migration/upgrade-to-v2) for what to do after the
 codemod runs.
 
 The codemod handles the v1→v2 SDK surface upgrade only. Adopting the 2026-07-28
 protocol revision (`createMcpHandler`, multi-round-trip requests, `versionNegotiation`)
 is architectural and not codemod-automatable — see
-[docs/migration/support-2026-07-28.md](../../docs/migration/support-2026-07-28.md).
+[docs/migration/support-2026-07-28.md](https://ts.sdk.modelcontextprotocol.io/v2/migration/support-2026-07-28).
