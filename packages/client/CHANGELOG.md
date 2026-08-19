@@ -1,5 +1,57 @@
 # @modelcontextprotocol/client
 
+## 2.0.1
+
+### Patch Changes
+
+- [#2654](https://github.com/modelcontextprotocol/typescript-sdk/pull/2654) [`03842cd`](https://github.com/modelcontextprotocol/typescript-sdk/commit/03842cd9cae9a9b142c77d2fb65e829fc4e03eab) Thanks [@pshah19](https://github.com/pshah19)! - Treat request id `0` as a real id. Two guards tested a `RequestId` for truthiness, so the legal JSON-RPC ids `0` and `''` were read as absent. Id `0` is not a corner case: the outbound request counter is zero-based, so it is the first id every peer assigns, which on the server→client leg is the first `sampling/createMessage`, `elicitation/create`, or `roots/list` a server sends.
+    - `notifications/cancelled` carrying id `0` was ignored, and the in-flight handler ran to completion with its `AbortSignal` never fired.
+    - A notification sent with `relatedRequestId: 0` wrongly passed the debounce gate (for methods opted into `debouncedNotificationMethods`). Because the pending set is keyed by method alone, a second such notification in the same tick was silently dropped rather than sent.
+
+    Absent is now the only value that means "no id".
+
+- [#2668](https://github.com/modelcontextprotocol/typescript-sdk/pull/2668) [`3e90449`](https://github.com/modelcontextprotocol/typescript-sdk/commit/3e90449fd52997da43b79a536d2c19c446603cc7) Thanks [@KKonstantinov](https://github.com/KKonstantinov)! - Stop sending `notifications/cancelled` for the `initialize` handshake. The spec is explicit that a client MUST NOT attempt to cancel its `initialize` request, but the outbound cancel path fired for any in-flight request: aborting the `AbortSignal` passed to `connect()`, or letting the handshake hit its timeout, put a forbidden cancellation on the wire naming the initialize request id.
+
+    The local behaviour is unchanged — the caller's promise still rejects with the same abort/timeout error, and `connect()` still tears the connection down. Only the wire notification is suppressed. Every other method keeps the existing cancellation path.
+
+- [#2053](https://github.com/modelcontextprotocol/typescript-sdk/pull/2053) [`3924de9`](https://github.com/modelcontextprotocol/typescript-sdk/commit/3924de99df834302d89f5997a1b64ca268282284) Thanks [@SAY-5](https://github.com/SAY-5)! - Let `saveTokens` failures surface after a successful token refresh. In `auth()`, one `try`
+  wrapped both `refreshAuthorization()` and the `provider.saveTokens()` that persists its
+  result, and the `catch` deliberately swallows anything that is not an `OAuthError` — plus
+  `ServerError` — so that a failed refresh falls through to a fresh authorization request.
+  A persistence error thrown by the provider landed in that same branch: it was discarded
+  with no log and no rethrow, and `auth()` continued to `startAuthorization()` and returned
+  `'REDIRECT'`.
+
+    Against an authorization server that rotates refresh tokens (the OAuth 2.1 default, and
+    Keycloak's) this loses credentials rather than merely hiding an error. The exchange has
+    already succeeded server-side, so the old refresh token is invalidated at the moment the
+    new one is issued; dropping the new token set leaves nothing usable on either side. On a
+    headless or CLI client, where `redirectToAuthorization` is typically a no-op, the fallthrough
+    is silent and the client is left with stale tokens and no indication of why.
+
+    The `try`/`catch` now covers only `refreshAuthorization()`. Persisting the result happens
+    after it, on an unguarded path, so a provider's I/O error propagates to the caller.
+
+    Refresh-request failures keep their existing control flow exactly: a `ServerError` or an
+    unknown error still falls through to a new authorization flow, a non-`ServerError`
+    `OAuthError` is still rethrown, and `InsecureTokenEndpointError` is still surfaced. The
+    SEP-2352 `issuer` stamp written with the refreshed tokens is unchanged.
+
+    Those fallbacks no longer happen in silence, though. Both routes to an unexplained
+    re-authorization now emit a `console.warn` naming the cause: the in-place fallthrough in
+    the refresh block, and `auth()`'s outer recovery for `invalid_grant`, `invalid_client`,
+    and `unauthorized_client`, which discards stored credentials and retries. The second one
+    matters most in practice — an expired, revoked, or rotation-reuse-detected refresh token
+    is reported as `invalid_grant`, which is precisely the state a dropped token set leaves
+    behind for the next call.
+
+    Consumers whose `OAuthClientProvider.saveTokens` can reject should note that `auth()` may
+    now reject where it previously returned `'REDIRECT'` — that rejection is the failure that
+    was being discarded.
+
+- Updated dependencies []:
+    - @modelcontextprotocol/core@2.0.1
+
 ## 2.0.0
 
 ### Minor Changes
