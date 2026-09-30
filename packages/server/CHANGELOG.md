@@ -1,5 +1,16 @@
 # @modelcontextprotocol/server
 
+## 2.2.1
+
+### Patch Changes
+
+- [#2599](https://github.com/modelcontextprotocol/typescript-sdk/pull/2599) [`5238fba`](https://github.com/modelcontextprotocol/typescript-sdk/commit/5238fba4424f82ec1ae9f6f458dd655ab322062d) Thanks [@freya0926](https://github.com/freya0926)! - A server can now serve, and a client can now call, `tasks/get` and `tasks/cancel` of the Tasks extension (SEP-2663) on a 2026-07-28 connection, when the handler is registered and the request is sent with an explicit schema. Every other method that a protocol revision removed is still refused. If one server factory serves both eras and such a handler is meant for 2025-era clients only, register it only when `ctx.era === 'legacy'`.
+
+- [#2889](https://github.com/modelcontextprotocol/typescript-sdk/pull/2889) [`4d94e7b`](https://github.com/modelcontextprotocol/typescript-sdk/commit/4d94e7b1ccf769d94a7bbba7789f1ee6c7dfdd8c) Thanks [@claude](https://github.com/apps/claude)! - `registerTool` no longer converts tool schemas up front, so a server built per request stops converting every tool on every request. The warning about an invalid `x-mcp-header` declaration now appears each time tools are listed, not when the tool is registered.
+
+- Updated dependencies []:
+    - @modelcontextprotocol/core@2.2.1
+
 ## 2.2.0
 
 ### Patch Changes

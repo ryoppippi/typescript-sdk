@@ -1,5 +1,14 @@
 # @modelcontextprotocol/node
 
+## 2.1.1
+
+### Patch Changes
+
+- [#2897](https://github.com/modelcontextprotocol/typescript-sdk/pull/2897) [`7f4c12a`](https://github.com/modelcontextprotocol/typescript-sdk/commit/7f4c12a6ae6b8f22411f7772c88036e1c8055423) Thanks [@claude](https://github.com/apps/claude)! - `hono` is now a regular dependency of `@modelcontextprotocol/node`, so installs with strict peer-dependency checking no longer fail on the `hono` peer that `@hono/node-server` requires. No runtime change.
+
+- Updated dependencies [[`5238fba`](https://github.com/modelcontextprotocol/typescript-sdk/commit/5238fba4424f82ec1ae9f6f458dd655ab322062d), [`4d94e7b`](https://github.com/modelcontextprotocol/typescript-sdk/commit/4d94e7b1ccf769d94a7bbba7789f1ee6c7dfdd8c)]:
+    - @modelcontextprotocol/server@2.2.1
+
 ## 2.1.0
 
 ### Minor Changes
