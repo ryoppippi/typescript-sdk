@@ -1,5 +1,14 @@
 # @modelcontextprotocol/client
 
+## 2.2.1
+
+### Patch Changes
+
+- [#2599](https://github.com/modelcontextprotocol/typescript-sdk/pull/2599) [`5238fba`](https://github.com/modelcontextprotocol/typescript-sdk/commit/5238fba4424f82ec1ae9f6f458dd655ab322062d) Thanks [@freya0926](https://github.com/freya0926)! - A server can now serve, and a client can now call, `tasks/get` and `tasks/cancel` of the Tasks extension (SEP-2663) on a 2026-07-28 connection, when the handler is registered and the request is sent with an explicit schema. Every other method that a protocol revision removed is still refused. If one server factory serves both eras and such a handler is meant for 2025-era clients only, register it only when `ctx.era === 'legacy'`.
+
+- Updated dependencies []:
+    - @modelcontextprotocol/core@2.2.1
+
 ## 2.2.0
 
 ### Minor Changes
